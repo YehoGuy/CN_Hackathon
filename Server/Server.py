@@ -35,6 +35,42 @@ def broadcast_offer(udp_port, tcp_port):
             time.sleep(1)  # Wait for 1 second before broadcasting again
     except Exception as e:
         raise Exception(f"an error occurred while trying to broadcast the offer packet: {e}")
+    
+###TODO CONTINUE
+def handle_udp_messages(udp_socket):
+    '''
+        Handle incoming UDP messages on the given socket.
+    '''
+    print(f"{bcolors.OKGREEN} Listening for UDP messages... {bcolors.ENDC}")
+    while True:
+        try:
+            message, address = udp_socket.recvfrom(1024)  # Buffer size is 1024 bytes
+            print(f"[FROM UDP CLIENT] Received UDP message from {address}: {message.decode('utf-8')}")
+        except Exception as e:
+            print(f"[ERROR] Error receiving UDP message: {e}")
+
+###TODO CONTINUE
+def handle_tcp_connections(tcp_socket):
+    '''
+        Handle incoming TCP connections on the given socket.
+    '''
+    print(f"{bcolors.OKGREEN} Listening for TCP connections...{bcolors.ENDC}")
+    tcp_socket.listen()
+    while True:
+        try:
+            conn, addr = tcp_socket.accept()
+            print(f"[FROM TCP CLIENT]Accepted TCP connection from {addr}")
+            with conn:
+                while True:
+                    data = conn.recv(1024)  # Buffer size is 1024 bytes
+                    if not data:
+                        break
+                    print(f"Received TCP message from {addr}: {data.decode('utf-8')}")
+                    conn.sendall(data)  # Echo the received message
+        except Exception as e:
+            print(f"Error handling TCP connection: {e}")
+
+
 
 
 # Main function to start the server
@@ -44,12 +80,13 @@ def main():
         udp_socket = get_udp_socket()
         tcp_socket = get_tcp_socket()
         print(f"Selected UDP Port: {udp_socket.getsockname()[1]}")
-        print(f"Selected UDP Port: {tcp_socket.getsockname()[1]}")
+        print(f"Selected TDP Port: {tcp_socket.getsockname()[1]}")
         # Create and start a thread for broadcasting
         broadcast_thread = threading.Thread(target=broadcast_offer, args=(udp_socket.getsockname()[1], tcp_socket.getsockname()[1]), daemon=True)
         broadcast_thread.start()
         # Keep the server running
         while True:
+
             time.sleep(1)  
 
     except Exception as e:
