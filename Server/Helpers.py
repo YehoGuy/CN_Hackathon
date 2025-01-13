@@ -1,3 +1,4 @@
+import struct
 from scapy.all import * # type: ignore
 import socket
 
