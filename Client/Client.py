@@ -2,6 +2,8 @@ import socket
 import struct
 import threading
 import time
+from Helpers import create_request_packet
+from Helpers import is_payload_packet
 
 _OFFER_PORT = 13117
 
@@ -82,7 +84,6 @@ def start_tcp_connection(server_ip, tcp_port, file_size, id):
         tcp_socket.close()
 
 
-###TODO: should do request(client->server) & payload(server->client) UDP packets as told in the assignent
 def start_udp_communication(server_ip, udp_port, file_size, id):
     """
     Start a UDP connection to download the specified file size.
@@ -91,8 +92,8 @@ def start_udp_communication(server_ip, udp_port, file_size, id):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         # send size message
-        size_message = f"{file_size}\n".encode() # bytes
-        udp_socket.sendto(size_message, (server_ip, udp_port))
+        request_packet = create_request_packet(file_size)
+        udp_socket.sendto(request_packet, (server_ip, udp_port))
         bytes_received = 0
 
         # "The Client detects that the UDP transfer 
@@ -104,9 +105,15 @@ def start_udp_communication(server_ip, udp_port, file_size, id):
 
         while bytes_received < file_size:
             try:
-                data, _ = udp_socket.recvfrom(4096)  # Receive 4KB chunks
-                bytes_received += len(data)
+                data, address = udp_socket.recvfrom(1024)  # Receive one udp packet up to 1kB
+                if(is_payload_packet(data)):
+                    bytes_received += 512
             except socket.timeout:
+                end_time = time.perf_counter()
+                total_time = end_time - start_time
+                total_speed_bps = file_size*8 / total_time
+                succ_rate = 100 if bytes_received > file_size else bytes_received*100 / file_size
+                print(f"UDP transfer #{id} finished, total time: {total_time:.2f} seconds, total speed: {total_speed_bps:.2f} bits/second, percentage of packets received successfully: {succ_rate:.2f}%")
                 break
         
         end_time = time.perf_counter()
