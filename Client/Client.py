@@ -54,14 +54,15 @@ def start_tcp_connection(server_ip, tcp_port, file_size, id):
     try:
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcp_socket.connect((server_ip, tcp_port))
+
+        size_message = f"{file_size}\n".encode() # bytes
+        tcp_socket.send(size_message)
+        bytes_received = 0
+
         # to measure time, we use time.perf_counter() 
         # which is designed for high resolution time measurements
         start_time = time.perf_counter()
 
-        size_message = f"{file_size}\n".encode() # bytes
-        tcp_socket.send(size_message)
-
-        bytes_received = 0
         while bytes_received < file_size:
             data = tcp_socket.recv(4096)  # Receive 4KB chunks
             if not data:
@@ -80,22 +81,41 @@ def start_tcp_connection(server_ip, tcp_port, file_size, id):
     finally:
         tcp_socket.close()
 
-def start_udp_connection(server_ip, udp_port, file_size):
+
+
+def start_udp_communication(server_ip, udp_port, file_size, id):
     """
     Start a UDP connection to download the specified file size.
     """
     try:
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        udp_socket.sendto(b"START", (server_ip, udp_port))
-        print(f"UDP connection initiated with {server_ip}:{udp_port}")
 
+        # send size message
+        size_message = f"{file_size}\n".encode() # bytes
+        udp_socket.sendto(size_message, (server_ip, udp_port))
         bytes_received = 0
-        while bytes_received < file_size:
-            data, _ = udp_socket.recvfrom(4096)  # Receive 4KB chunks
-            bytes_received += len(data)
-            print(f"UDP: Downloaded {bytes_received / (1024 * 1024):.2f} MB")
 
-        print(f"UDP download complete: {bytes_received / (1024 * 1024):.2f} MB")
+        # "The Client detects that the UDP transfer 
+        # concludes after no data has been received for 1 second."
+        udp_socket.settimeout(1)  
+        # to measure time, we use time.perf_counter() 
+        # which is designed for high resolution time measurements
+        start_time = time.perf_counter()
+
+        while bytes_received < file_size:
+            try:
+                data, _ = udp_socket.recvfrom(4096)  # Receive 4KB chunks
+                bytes_received += len(data)
+            except socket.timeout:
+                break
+        
+        end_time = time.perf_counter()
+
+        total_time = end_time - start_time
+        total_speed_bps = file_size*8 / total_time
+        succ_rate = 100 if bytes_received > file_size else bytes_received*100 / file_size
+
+        print(f"UDP transfer #{id} finished, total time: {total_time:.2f} seconds, total speed: {total_speed_bps:.2f} bits/second, percentage of packets received successfully: {succ_rate:.2f}%")
 
     except Exception as e:
         print(f"Error in UDP connection: {e}")
@@ -115,7 +135,7 @@ def start(file_size, tcp_connections, udp_connections):
         threading.Thread(target=start_tcp_connection, args=(address[0], tcp_port, file_size, i), daemon=True).start()
     # Start UDP connections
     for i in range(udp_connections):
-        threading.Thread(target=start_udp_connection, args=(address[0], udp_port, file_size, i), daemon=True).start()
+        threading.Thread(target=start_udp_communication, args=(address[0], udp_port, file_size, i), daemon=True).start()
 
 
 if __name__ == "__main__":
@@ -126,6 +146,7 @@ if __name__ == "__main__":
         tcp_connections = int(input("Enter the number of TCP connections: "))
         udp_connections = int(input("Enter the number of UDP connections: "))
         start(file_size, tcp_connections, udp_connections)
+        print("Complete, ", end="")
 
 
 
