@@ -36,6 +36,8 @@ def broadcast_offer(udp_port, tcp_port):
     except Exception as e:
         raise Exception(f"an error occurred while trying to broadcast the offer packet: {e}")
     
+    
+    
 ###TODO CONTINUE
 def handle_udp_messages(udp_socket):
     '''
@@ -44,6 +46,7 @@ def handle_udp_messages(udp_socket):
     print(f"{bcolors.OKGREEN} Listening for UDP messages... {bcolors.ENDC}")
     while True:
         try:
+            # !!! recvfrom is blocking so No Busy Waiting !!!
             message, address = udp_socket.recvfrom(1024)  # Buffer size is 1024 bytes
             print(f"[FROM UDP CLIENT] Received UDP message from {address}: {message.decode('utf-8')}")
         except Exception as e:
@@ -86,15 +89,13 @@ def main():
         broadcast_thread.start()
         # Keep the server running
         while True:
-
             time.sleep(1)  
 
     except Exception as e:
         print(f"\n{bcolors.RED} [ERROR] Server shutting down. {bcolors.ENDC}")
         print(f"\n{bcolors.RED} [CAUSE] {bcolors.ENDC} {e}")
     except KeyboardInterrupt as e:
-        print(f"\n{bcolors.RED} [ERROR] Server got KeyboardInterrupted. {bcolors.ENDC}")
-        print(f"\n{bcolors.RED} [CAUSE] {bcolors.ENDC} {e}")
+        print(f"\n{bcolors.RED} [QUIT] Server got KeyboardInterrupted. {bcolors.ENDC}")
 
     
     

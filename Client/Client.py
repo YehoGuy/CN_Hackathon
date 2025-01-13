@@ -82,7 +82,7 @@ def start_tcp_connection(server_ip, tcp_port, file_size, id):
         tcp_socket.close()
 
 
-
+###TODO: should do request(client->server) & payload(server->client) UDP packets as told in the assignent
 def start_udp_communication(server_ip, udp_port, file_size, id):
     """
     Start a UDP connection to download the specified file size.
