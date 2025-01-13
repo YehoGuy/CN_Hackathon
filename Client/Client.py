@@ -1,6 +1,7 @@
 import socket
 import struct
 import threading
+import time
 
 _OFFER_PORT = 13117
 
@@ -46,26 +47,33 @@ def listen_for_offer(offer_port):
 
 
 
-def start_tcp_connection(server_ip, tcp_port, file_size):
+def start_tcp_connection(server_ip, tcp_port, file_size, id):
     """
     Start a TCP connection to download the specified file size.
     """
     try:
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcp_socket.connect((server_ip, tcp_port))
-        print(f"TCP connection established with {server_ip}:{tcp_port}")
+        # to measure time, we use time.perf_counter() 
+        # which is designed for high resolution time measurements
+        start_time = time.perf_counter()
 
         size_message = f"{file_size}\n".encode() # bytes
         tcp_socket.send(size_message)
+
         bytes_received = 0
         while bytes_received < file_size:
             data = tcp_socket.recv(4096)  # Receive 4KB chunks
             if not data:
                 break
             bytes_received += len(data)
-            print(f"TCP: Downloaded {bytes_received / (1024 * 1024):.2f} MB")
 
-        print(f"TCP download complete: {bytes_received / (1024 * 1024):.2f} MB")
+        end_time = time.perf_counter()
+
+        total_time = end_time - start_time
+        total_speed_bps = file_size*8 / total_time
+
+        print(f"TCP transfer #{id} finished, total time: {total_time:.2f} seconds, total speed: {total_speed_bps:.2f} bits/second")
 
     except Exception as e:
         print(f"Error in TCP connection: {e}")
@@ -104,10 +112,10 @@ def start(file_size, tcp_connections, udp_connections):
     print(f"  TCP Port: {tcp_port}")
     # Start TCP connections
     for i in range(tcp_connections):
-        threading.Thread(target=start_tcp_connection, args=(address[0], tcp_port, file_size), daemon=True).start()
+        threading.Thread(target=start_tcp_connection, args=(address[0], tcp_port, file_size, i), daemon=True).start()
     # Start UDP connections
     for i in range(udp_connections):
-        threading.Thread(target=start_udp_connection, args=(address[0], udp_port, file_size), daemon=True).start()
+        threading.Thread(target=start_udp_connection, args=(address[0], udp_port, file_size, i), daemon=True).start()
 
 
 if __name__ == "__main__":
