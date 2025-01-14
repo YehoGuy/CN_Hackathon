@@ -1,12 +1,14 @@
 import threading
 import struct
 import time
-from scapy.all import * # type: ignore
 import socket
 from Helpers import get_local_ip
-from Helpers import create_offer_packet
+from EncoderDecoder import create_offer_packet
 from Helpers import get_udp_socket
 from Helpers import get_tcp_socket
+from EncoderDecoder import decode_request_packet
+from EncoderDecoder import create_payload_packet
+from EncoderDecoder import PAYLOAD_SIZE
 
 class bcolors:
     HEADER = '\033[95m'
@@ -38,8 +40,7 @@ def broadcast_offer(udp_port, tcp_port):
     
     
     
-###TODO CONTINUE
-def handle_udp_messages(udp_socket):
+def listen_for_udp_requests(udp_socket):
     '''
         Handle incoming UDP messages on the given socket.
     '''
@@ -47,13 +48,27 @@ def handle_udp_messages(udp_socket):
     while True:
         try:
             # !!! recvfrom is blocking so No Busy Waiting !!!
-            message, address = udp_socket.recvfrom(1024)  # Buffer size is 1024 bytes
-            print(f"[FROM UDP CLIENT] Received UDP message from {address}: {message.decode('utf-8')}")
+            message, address = udp_socket.recvfrom(1024)  #recvfrom brings one packet at a time
+            threading.Thread(target=handle_udp_client, args=(message, address), daemon=True).start()
         except Exception as e:
             print(f"[ERROR] Error receiving UDP message: {e}")
 
-###TODO CONTINUE
-def handle_tcp_connections(tcp_socket):
+def handle_udp_client(message, address):
+    file_size = decode_request_packet(message)
+    if file_size is not None:
+        print(f"[UDP client {address}] Received UDP message: {file_size} bytes")
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        with udp_socket:
+            number_of_segments = file_size//PAYLOAD_SIZE if file_size % PAYLOAD_SIZE == 0 else file_size//PAYLOAD_SIZE+1
+            # send size message
+            for i in range(number_of_segments):
+                payload_packet = create_payload_packet(number_of_segments, i+1)
+                udp_socket.sendto(payload_packet, address)
+        print(f"[UDP client {address}] sent {file_size} bytes in {number_of_segments} segments")
+
+
+
+def listen_for_tcp_requests(tcp_socket):
     '''
         Handle incoming TCP connections on the given socket.
     '''
@@ -61,18 +76,34 @@ def handle_tcp_connections(tcp_socket):
     tcp_socket.listen()
     while True:
         try:
+            # !! BLOCKING no busy-waiting !!
             conn, addr = tcp_socket.accept()
-            print(f"[FROM TCP CLIENT]Accepted TCP connection from {addr}")
-            with conn:
-                while True:
-                    data = conn.recv(1024)  # Buffer size is 1024 bytes
-                    if not data:
-                        break
-                    print(f"Received TCP message from {addr}: {data.decode('utf-8')}")
-                    conn.sendall(data)  # Echo the received message
+            threading.Thread(target=handle_tcp_client, args=(conn, addr), daemon=True).start()
         except Exception as e:
             print(f"Error handling TCP connection: {e}")
 
+
+def handle_tcp_client(conn, addr):
+    '''
+        Handle incoming TCP connections on the given socket.
+    '''
+    try:
+        print(f"[TCP CLIENT {addr}] Accepted TCP connection")
+        with conn:
+            data = b""
+            while True:
+                byte = conn.recv(1)
+                if not byte:  # Client disconnected
+                    raise Exception("illegal byte from client")
+                if byte == b'\n':  # Stop when newline is found
+                    break
+                data += byte
+            file_size = (int)(data.decode('utf-8'))
+            demi_file = ('A'*file_size).encode('utf-8')
+            conn.sendall(demi_file)
+            print(f"[TCP CLIENT {addr}] Sent {file_size} bytes to client")
+    except Exception as e:
+        print(f"[FROM TCP CLIENT {addr}] Error handling TCP connection: {e}")
 
 
 
@@ -83,10 +114,14 @@ def main():
         udp_socket = get_udp_socket()
         tcp_socket = get_tcp_socket()
         print(f"Selected UDP Port: {udp_socket.getsockname()[1]}")
-        print(f"Selected TDP Port: {tcp_socket.getsockname()[1]}")
-        # Create and start a thread for broadcasting
+        print(f"Selected TCP Port: {tcp_socket.getsockname()[1]}")
+        # Create and start a thread for broadcasting. daemon = True to stop the thread when the main thread stops
         broadcast_thread = threading.Thread(target=broadcast_offer, args=(udp_socket.getsockname()[1], tcp_socket.getsockname()[1]), daemon=True)
         broadcast_thread.start()
+        udp_handling_thread = threading.Thread(target=listen_for_udp_requests, args=(udp_socket,), daemon=True)
+        udp_handling_thread.start()
+        tcp_handling_thread = threading.Thread(target=listen_for_tcp_requests, args=(tcp_socket,), daemon=True)
+        tcp_handling_thread.start()
         # Keep the server running
         while True:
             time.sleep(1)  
