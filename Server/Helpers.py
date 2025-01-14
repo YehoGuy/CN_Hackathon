@@ -1,5 +1,4 @@
 import struct
-from scapy.all import * # type: ignore
 import socket
 
 
@@ -23,25 +22,6 @@ def get_local_ip():
         local_ip = s.getsockname()[0]
     return local_ip
 
-
-def create_offer_packet(udp_port, tcp_port):
-    '''
-        This Method is used to create the offer packet.
-        Args:
-            udp_port (int): The UDP port to be sent in the offer packet.
-            tcp_port (int): The TCP port to be sent in the offer packet.
-        Returns:
-            offer_packet (bytes): The offer packet in binary format.
-    '''
-    # Packet fields
-    magic_cookie = 0xabcddcba  # 4 bytes
-    message_type = 0x2         # 1 byte
-    
-    # Pack the data into binary format using struct
-    # '!I B H H' means: ! - network byte order, I - unsigned int (4 bytes), 
-    #                   B - unsigned char (1 byte), H - unsigned short (2 bytes)
-    offer_packet = struct.pack('!I B H H', magic_cookie, message_type, udp_port, tcp_port)
-    return offer_packet
 
 def get_udp_socket():
     '''
