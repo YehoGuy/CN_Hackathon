@@ -124,7 +124,7 @@ def start_udp_communication(server_ip, udp_port, file_size, id):
         end_time = time.perf_counter()
 
         total_time = end_time - start_time
-        succ_rate = 100 if bytes_received > file_size else bytes_received*100 / file_size
+        succ_rate = 100 if bytes_received >= file_size else bytes_received*100 / file_size
         total_speed_bps = file_size*8*succ_rate // (total_time*100)
 
         print(f"UDP transfer #{id} finished, total time: {total_time:.6f} seconds, total speed: {total_speed_bps} bits/second, percentage of packets received successfully: {succ_rate:.2f}%")
@@ -164,16 +164,22 @@ if __name__ == "__main__":
         while(True):
             # Prompt user for inputs
             # (in python 3, int can hold very large numbers)
-            file_size = int(input(f"{bcolors.HEADER} Enter file size in Bytes: {bcolors.ENDC}"))
-            tcp_connections = int(input(f"{bcolors.HEADER} Enter the number of TCP connections: {bcolors.ENDC}"))
-            udp_connections = int(input(f"{bcolors.HEADER} Enter the number of UDP connections: {bcolors.ENDC}"))
-            start(file_size, tcp_connections, udp_connections)
-            print(f"\n{bcolors.OKGREEN} Complete, {bcolors.ENDC}", end="")
+            try:
+                file_size = int(input(f"{bcolors.HEADER} Enter file size in Bytes: {bcolors.ENDC}"))
+                if file_size < 0:
+                    raise ValueError("File size must be a non-negative integer")
+                tcp_connections = int(input(f"{bcolors.HEADER} Enter the number of TCP connections: {bcolors.ENDC}"))
+                udp_connections = int(input(f"{bcolors.HEADER} Enter the number of UDP connections: {bcolors.ENDC}"))
+                start(file_size, tcp_connections, udp_connections)
+                print(f"\n{bcolors.OKGREEN} Complete, {bcolors.ENDC}", end="")
+            except ValueError as e:
+                print(f"\n{bcolors.RED} [ERROR] Invalid input. values must be non-negative Integers. {bcolors.ENDC}")
+    except KeyboardInterrupt as e:
+        print(f"\n\n{bcolors.RED} [QUIT] Client got KeyboardInterrupted. {bcolors.ENDC}")
     except Exception as e:
         print(f"\n{bcolors.RED} [ERROR] Client shutting down. {bcolors.ENDC}")
         print(f"\n{bcolors.RED} [CAUSE] {bcolors.ENDC} {e}")
-    except KeyboardInterrupt as e:
-        print(f"\n\n{bcolors.RED} [QUIT] Client got KeyboardInterrupted. {bcolors.ENDC}")
+    
 
 
 
